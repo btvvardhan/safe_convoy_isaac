@@ -1,237 +1,235 @@
 # src/run_convoy.py
 #
-# Simple leader–follower convoy in a "warehouse" made from boxes.
-# Uses single-integrator style kinematics (like Robotarium):
-#   x_{k+1} = x_k + u * dt
+# Leader–follower convoy using REAL Isaac assets:
+#   - Environment: Simple Warehouse (warehouse_multiple_shelves.usd)
+#   - Robots: NVIDIA Jetbot (differential drive)
 #
-# Step 1: Start Isaac Sim and create a World.
-# Step 2: Add ground plane and shelf-like obstacles.
-# Step 3: Add leader + follower "robots" as colored cubes.
-# Step 4: Every frame:
-#         - compute leader velocity toward goal
-#         - compute follower velocities toward formation positions
-#         - integrate positions and set world poses
-#         - step physics + render
+# Control (still simple P-control for now):
+#   - Single-integrator style formation control in 2D (x, y)
+#   - Converted to (v, ω) unicycle commands
+#   - Sent to Jetbot wheels via DifferentialController
+#
+# Goal: Confirm that warehouse + Jetbots + controllers are wired correctly.
 
-from isaacsim import SimulationApp  # Isaac Sim standalone helper 
+from isaacsim import SimulationApp  # Standalone launcher
 
-# Launch Isaac Sim before any other Omniverse imports
+# Launch Isaac Sim before other Omniverse imports
 simulation_app = SimulationApp({"headless": False})
 
-from isaacsim.core.api import World
-from isaacsim.core.api.objects import DynamicCuboid
 import numpy as np
 
+from isaacsim.core.api import World
+from isaacsim.core.utils.stage import add_reference_to_stage
+from isaacsim.storage.native import get_assets_root_path  # matches mobile_robot_controllers example 
 
-def create_warehouse_layout(world: World):
+from isaacsim.robot.wheeled_robots.robots import WheeledRobot
+from isaacsim.robot.wheeled_robots.controllers.differential_controller import (
+    DifferentialController,
+)
+
+
+def quat_to_yaw(quat: np.ndarray) -> float:
+    """Convert quaternion (x, y, z, w) to yaw (rotation around z)."""
+    x, y, z, w = quat
+    siny_cosp = 2.0 * (w * z + x * y)
+    cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+    return np.arctan2(siny_cosp, cosy_cosp)
+
+
+def si_to_unicycle(u_xy: np.ndarray, theta: float, v_max: float, w_max: float):
     """
-    Create a simple warehouse-like corridor layout using tall boxes as shelves.
-    All dimensions are in meters (default stage units).
+    Map single-integrator velocity u = [u_x, u_y] in world frame
+    to unicycle (v, omega) given current heading theta.
     """
-    shelf_height = 1.8
-    shelf_thickness = 0.1
-    shelf_length = 4.0
+    if np.linalg.norm(u_xy) < 1e-6:
+        return 0.0, 0.0
 
-    color_shelf = np.array([0.4, 0.4, 0.4])
+    desired_dir = np.arctan2(u_xy[1], u_xy[0])
+    angle_err = np.arctan2(
+        np.sin(desired_dir - theta), np.cos(desired_dir - theta)
+    )  # wrap to [-pi, pi]
 
-    # Row 1 (y = +0.7)
-    world.scene.add(
-        DynamicCuboid(
-            prim_path="/World/shelf_row_1",
-            name="shelf_row_1",
-            position=np.array([0.0, 0.7, shelf_height / 2.0]),
-            scale=np.array([shelf_length, shelf_thickness, shelf_height]),
-            color=color_shelf,
+    v = np.linalg.norm(u_xy) * np.cos(angle_err)
+    v = float(np.clip(v, -v_max, v_max))
+
+    omega = 2.0 * angle_err  # simple gain
+    omega = float(np.clip(omega, -w_max, w_max))
+
+    return v, omega
+
+
+def create_world_and_environment():
+    """Create a World and load the Simple Warehouse environment."""
+    # Create world
+    world = World()
+    world.scene.add_default_ground_plane()
+
+    assets_root = get_assets_root_path()
+    if assets_root is None:
+        raise RuntimeError(
+            "Could not find Nucleus assets root. "
+            "Open Isaac Sim GUI once and connect to the /Isaac content server."
         )
+
+    # Simple Warehouse environment
+    # Check in the Asset Browser that this path exists:
+    # Isaac/Environments/Simple_Warehouse/warehouse_multiple_shelves.usd 
+    env_usd_path = (
+        assets_root
+        + "/Isaac/Environments/Simple_Warehouse/warehouse_multiple_shelves.usd"
     )
 
-    # Row 2 (y = -0.7)
-    world.scene.add(
-        DynamicCuboid(
-            prim_path="/World/shelf_row_2",
-            name="shelf_row_2",
-            position=np.array([0.0, -0.7, shelf_height / 2.0]),
-            scale=np.array([shelf_length, shelf_thickness, shelf_height]),
-            color=color_shelf,
-        )
-    )
+    add_reference_to_stage(usd_path=env_usd_path, prim_path="/World/Warehouse")
 
-    # Shorter shelves near goal to look like a loading zone
-    world.scene.add(
-        DynamicCuboid(
-            prim_path="/World/shelf_goal_left",
-            name="shelf_goal_left",
-            position=np.array([1.8, 0.4, shelf_height / 2.0]),
-            scale=np.array([0.8, shelf_thickness, shelf_height]),
-            color=color_shelf,
-        )
-    )
-    world.scene.add(
-        DynamicCuboid(
-            prim_path="/World/shelf_goal_right",
-            name="shelf_goal_right",
-            position=np.array([1.8, -0.4, shelf_height / 2.0]),
-            scale=np.array([0.8, shelf_thickness, shelf_height]),
-            color=color_shelf,
-        )
-    )
+    print("[INFO] Assets root:", assets_root)
+    print("[INFO] Loaded warehouse from:", env_usd_path)
+
+    return world, assets_root
 
 
-def create_convoy(world: World, num_followers: int = 3):
+def create_jetbot_convoy(world: World, assets_root: str, num_followers: int = 3):
     """
-    Create leader + followers as colored cubes.
+    Spawn a Jetbot leader + followers using WheeledRobot.
 
     Returns:
-        robots: list[DynamicCuboid] with robots[0] = leader
+        robots    : list[WheeledRobot] (robots[0] is leader)
+        ctrls     : list[DifferentialController]
+        offsets   : list[np.ndarray] follower formation offsets relative to leader
     """
     robots = []
+    controllers = []
 
-    # Z position slightly above ground plane
-    z_robot = 0.3
+    # IMPORTANT: Jetbot path (matches docs) 
+    jetbot_usd = assets_root + "/Isaac/Robots/NVIDIA/Jetbot/jetbot.usd"
 
-    # Leader (red cube) starting near x = -1.8, y = 0
+    print("[INFO] Using Jetbot asset:", jetbot_usd)
+
+    # Leader initial pose (left side of warehouse)
+    leader_start_pos = np.array([-4.0, 0.0, 0.0])  # x, y, z
+
     leader = world.scene.add(
-        DynamicCuboid(
-            prim_path="/World/robot_0",
-            name="robot_0",
-            position=np.array([-1.8, 0.0, z_robot]),
-            scale=np.array([0.25, 0.25, 0.25]),
-            color=np.array([1.0, 0.0, 0.0]),  # red
+        WheeledRobot(
+            prim_path="/World/Jetbot_0",
+            name="jetbot_0",
+            wheel_dof_names=["left_wheel_joint", "right_wheel_joint"],
+            create_robot=True,
+            usd_path=jetbot_usd,
+            position=leader_start_pos,
         )
     )
     robots.append(leader)
 
-    # Followers (blue / green / yellow / magenta cycling)
-    follower_colors = [
-        np.array([0.0, 0.0, 1.0]),
-        np.array([0.0, 1.0, 0.0]),
-        np.array([1.0, 1.0, 0.0]),
-        np.array([1.0, 0.0, 1.0]),
-    ]
-
-    spacing = 0.5  # spacing along x-axis behind leader
-
+    # Followers behind leader in x-direction
+    spacing = 0.7
     for i in range(num_followers):
-        color = follower_colors[i % len(follower_colors)]
-        x = -1.8 - (i + 1) * spacing
-        y = 0.0
+        x = leader_start_pos[0] - (i + 1) * spacing
+        y = leader_start_pos[1]
         follower = world.scene.add(
-            DynamicCuboid(
-                prim_path=f"/World/robot_{i+1}",
-                name=f"robot_{i+1}",
-                position=np.array([x, y, z_robot]),
-                scale=np.array([0.25, 0.25, 0.25]),
-                color=color,
+            WheeledRobot(
+                prim_path=f"/World/Jetbot_{i+1}",
+                name=f"jetbot_{i+1}",
+                wheel_dof_names=["left_wheel_joint", "right_wheel_joint"],
+                create_robot=True,
+                usd_path=jetbot_usd,
+                position=np.array([x, y, leader_start_pos[2]]),
             )
         )
         robots.append(follower)
 
-    return robots
+    # Differential controllers for each robot (values from docs) 
+    for i, _ in enumerate(robots):
+        ctrl = DifferentialController(
+            name=f"diff_ctrl_{i}",
+            wheel_radius=0.03,
+            wheel_base=0.1125,
+            max_linear_speed=0.5,
+            max_angular_speed=2.0,
+        )
+        controllers.append(ctrl)
 
-
-def run_simulation():
-    # 1) Create world and basic environment
-    world = World()
-    world.scene.add_default_ground_plane()
-
-    # Warehouse shelves
-    create_warehouse_layout(world)
-
-    # 2) Spawn robots
-    num_followers = 3
-    robots = create_convoy(world, num_followers=num_followers)
-    leader = robots[0]
-
-    # 3) Reset world once everything is added (Hello-World style) 
-    world.reset()
-
-    # Physics timestep (approx) for integration
-    try:
-        dt = world.get_physics_dt()
-    except Exception:
-        dt = 1.0 / 60.0
-
-    # 4) Leader–follower parameters
-    goal_xy = np.array([2.0, 0.0])  # "unloading zone" on the right
-    leader_speed = 0.5              # m/s
-    follower_k = 1.5                # gain for followers
-    max_speed = 1.0                 # clamp
-
-    # Formation offsets (in world frame, relative to leader)
-    # Simple single-file line behind leader:
+    # Formation offsets relative to leader (in world frame)
     formation_offsets = []
-    spacing = 0.5
     for i in range(num_followers):
-        # offset in x only: follower i is (i+1)*spacing behind leader
         formation_offsets.append(np.array([-(i + 1) * spacing, 0.0]))
 
-    # Helper: extract xy from robot pose
-    def get_xy(robot):
-        pos, _ = robot.get_world_pose()
-        return np.array([pos[0], pos[1]]), pos[2]
+    return robots, controllers, formation_offsets
 
-    # Helper: saturate 2D velocity
-    def clamp_vel(v):
-        norm = np.linalg.norm(v)
-        if norm > max_speed:
-            return v * (max_speed / norm)
-        return v
 
-    # 5) Main simulation loop
-    num_steps = 2000  # ~num_steps * dt seconds total
-    for _ in range(num_steps):
-        # --- Leader control: move toward goal ---
-        leader_xy, leader_z = get_xy(leader)
+def main():
+    # 1) World + environment
+    world, assets_root = create_world_and_environment()
+
+    # 2) Jetbot convoy
+    num_followers = 3
+    robots, controllers, formation_offsets = create_jetbot_convoy(
+        world, assets_root, num_followers=num_followers
+    )
+    leader = robots[0]
+
+    # 3) Reset world (initializes physics & articulations)
+    world.reset()
+
+    # 4) Convoy control parameters
+    goal_xy = np.array([4.0, 0.0])  # right side of warehouse
+    leader_speed = 0.6
+    follower_k = 1.5
+    v_max = 0.7
+    w_max = 2.0
+
+
+    def get_xy_theta(robot: WheeledRobot):
+        # WheeledRobot provides get_world_pose(), not get_world_poses()
+        pos, quat = robot.get_world_pose()  # pos: (3,), quat: (4,)
+        xy = np.array([pos[0], pos[1]])
+        theta = quat_to_yaw(quat)
+        return xy, theta
+
+
+    def convoy_step(step_size: float):
+        # Leader
+        leader_xy, leader_theta = get_xy_theta(leader)
         to_goal = goal_xy - leader_xy
         dist_to_goal = np.linalg.norm(to_goal)
 
-        if dist_to_goal > 0.1:
-            v_leader = leader_speed * to_goal / (dist_to_goal + 1e-6)
+        if dist_to_goal > 0.2:
+            u_leader = leader_speed * to_goal / (dist_to_goal + 1e-6)
         else:
-            v_leader = np.zeros(2)
+            u_leader = np.zeros(2)
 
-        v_leader = clamp_vel(v_leader)
-
-        # Integrate leader position
-        new_leader_xy = leader_xy + v_leader * dt
-        leader.set_world_pose(
-            position=np.array([new_leader_xy[0], new_leader_xy[1], leader_z]),
-            orientation=np.array([0.0, 0.0, 0.0, 1.0]),
+        v_leader, w_leader = si_to_unicycle(
+            u_leader, leader_theta, v_max=v_max, w_max=w_max
         )
+        leader_action = controllers[0].forward(command=[v_leader, w_leader])
+        leader.apply_action(leader_action)
 
-        # --- Followers: track formation around leader ---
-        # Update leader_xy after we moved it
-        leader_xy, leader_z = get_xy(leader)
+        # Followers
+        leader_xy, leader_theta = get_xy_theta(leader)
 
         for i in range(1, len(robots)):
             follower = robots[i]
-            follower_xy, follower_z = get_xy(follower)
+            follower_xy, follower_theta = get_xy_theta(follower)
 
-            # desired position = leader position + offset_i
             offset = formation_offsets[i - 1]
             ref_xy = leader_xy + offset
 
             error = follower_xy - ref_xy
+            u_follower = -follower_k * error
 
-            # simple proportional law u = -k * error
-            v_follower = -follower_k * error
-            v_follower = clamp_vel(v_follower)
-
-            new_follower_xy = follower_xy + v_follower * dt
-
-            follower.set_world_pose(
-                position=np.array(
-                    [new_follower_xy[0], new_follower_xy[1], follower_z]
-                ),
-                orientation=np.array([0.0, 0.0, 0.0, 1.0]),
+            v_f, w_f = si_to_unicycle(
+                u_follower, follower_theta, v_max=v_max, w_max=w_max
             )
+            follower_action = controllers[i].forward(command=[v_f, w_f])
+            follower.apply_action(follower_action)
 
-        # Step physics + render one frame
+    # Register physics callback
+    world.add_physics_callback("convoy_step", convoy_step)
+
+    # 5) Main loop
+    while simulation_app.is_running():
         world.step(render=True)
 
-    # Clean shutdown
     simulation_app.close()
 
 
 if __name__ == "__main__":
-    run_simulation()
+    main()
