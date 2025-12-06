@@ -1,10 +1,10 @@
-# run_convoy.py
+# src/run_convoy.py
 #
 # Simple leader–follower convoy in a "warehouse" made from boxes.
 # Uses single-integrator style kinematics (like Robotarium):
 #   x_{k+1} = x_k + u * dt
 #
-# Step 1: Start Isaac Sim and create a World (Hello-World style).
+# Step 1: Start Isaac Sim and create a World.
 # Step 2: Add ground plane and shelf-like obstacles.
 # Step 3: Add leader + follower "robots" as colored cubes.
 # Step 4: Every frame:
@@ -13,23 +13,21 @@
 #         - integrate positions and set world poses
 #         - step physics + render
 
-from isaacsim import SimulationApp  # Isaac Sim 4.5+ standalone helper (from docs) 
+from isaacsim import SimulationApp  # Isaac Sim standalone helper 
 
-# launch Isaac Sim before any other imports
+# Launch Isaac Sim before any other Omniverse imports
 simulation_app = SimulationApp({"headless": False})
 
-# Now we can safely import Isaac Sim / Omniverse APIs
 from isaacsim.core.api import World
 from isaacsim.core.api.objects import DynamicCuboid
 import numpy as np
 
 
-def create_warehouse_layout(world):
+def create_warehouse_layout(world: World):
     """
     Create a simple warehouse-like corridor layout using tall boxes as shelves.
     All dimensions are in meters (default stage units).
     """
-    # Just a few rows of shelves: long boxes forming corridors
     shelf_height = 1.8
     shelf_thickness = 0.1
     shelf_length = 4.0
@@ -79,9 +77,10 @@ def create_warehouse_layout(world):
     )
 
 
-def create_convoy(world, num_followers=3):
+def create_convoy(world: World, num_followers: int = 3):
     """
     Create leader + followers as colored cubes.
+
     Returns:
         robots: list[DynamicCuboid] with robots[0] = leader
     """
@@ -102,7 +101,7 @@ def create_convoy(world, num_followers=3):
     )
     robots.append(leader)
 
-    # Followers (blue / green etc.)
+    # Followers (blue / green / yellow / magenta cycling)
     follower_colors = [
         np.array([0.0, 0.0, 1.0]),
         np.array([0.0, 1.0, 0.0]),
@@ -143,21 +142,20 @@ def run_simulation():
     robots = create_convoy(world, num_followers=num_followers)
     leader = robots[0]
 
-    # 3) Reset world once everything is added (from Hello World docs)
+    # 3) Reset world once everything is added (Hello-World style) 
     world.reset()
 
     # Physics timestep (approx) for integration
     try:
         dt = world.get_physics_dt()
     except Exception:
-        # Fallback if API changed
         dt = 1.0 / 60.0
 
     # 4) Leader–follower parameters
     goal_xy = np.array([2.0, 0.0])  # "unloading zone" on the right
     leader_speed = 0.5              # m/s
     follower_k = 1.5                # gain for followers
-    max_speed = 1.0                 # clamp (just to be safe)
+    max_speed = 1.0                 # clamp
 
     # Formation offsets (in world frame, relative to leader)
     # Simple single-file line behind leader:
@@ -180,8 +178,8 @@ def run_simulation():
         return v
 
     # 5) Main simulation loop
-    num_steps = 2000  # ~2000 * dt seconds total
-    for step in range(num_steps):
+    num_steps = 2000  # ~num_steps * dt seconds total
+    for _ in range(num_steps):
         # --- Leader control: move toward goal ---
         leader_xy, leader_z = get_xy(leader)
         to_goal = goal_xy - leader_xy
