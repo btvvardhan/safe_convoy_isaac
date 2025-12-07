@@ -159,7 +159,7 @@ class ClfCbfConvoyControllerDebug:
         # Solve
         problem = cp.Problem(objective, constraints)
         try:
-            problem.solve(solver=cp.OSQP, verbose=False, eps_abs=1e-4, eps_rel=1e-4, max_iter=4000)
+            problem.solve(solver=cp.OSQP, verbose=False)
             
             if problem.status in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
                 u_safe = u.value
