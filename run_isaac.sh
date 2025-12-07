@@ -7,4 +7,4 @@ ISAAC_ROOT="$HOME/isaac-sim"
 export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
 
 # Run the main script using Isaac's Python
-"$ISAAC_ROOT/python.sh" "$(pwd)/src/run_convoy_with_switch.py"
+"$ISAAC_ROOT/python.sh" "$(pwd)/src/run_convoy_debug.py"

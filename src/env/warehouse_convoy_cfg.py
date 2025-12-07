@@ -26,7 +26,13 @@ class WarehouseConvoyCfg:
 
     # Extra pallet obstacles (for CBF later)
     # Positions are in (x, y); z will be handled in env
+
     extra_obstacle_xy: Tuple[Tuple[float, float], ...] = (
-        (0.0, 0.8),
-        (0.0, -0.8),
+    (-2.0, 0.0),   # In the path!
+    (0.0, 0.15),   # In the path!
+    (2.0, -0.15),  # In the path!
     )
+    # extra_obstacle_xy: Tuple[Tuple[float, float], ...] = (
+    #     (0.0, 0.8),
+    #     (0.0, -0.8),
+    # )
