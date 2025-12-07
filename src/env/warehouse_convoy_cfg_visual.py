@@ -162,28 +162,28 @@ class WarehouseConvoyCfgVisual:
                     'leader_start_xy': (-4.0, 0.0),
                     'goal_xy': (4.0, 0.0),
                     'moving_obstacles_config': [
-                        # # North
-                        # {
-                        #     'id': 'human_north',
-                        #     'type': 'human',
-                        #     'start_xy': (0.0, 3.0),
-                        #     'motion': 'linear',
-                        #     'target_xy': (0.0, -3.0),
-                        #     'speed': 0.4,
-                        #     'size': (0.4, 0.3, 1.8),
-                        #     'color': (0.2, 0.4, 0.8),
-                        # },
-                        # # South
-                        # {
-                        #     'id': 'human_south',
-                        #     'type': 'human',
-                        #     'start_xy': (0.0, -3.0),
-                        #     'motion': 'linear',
-                        #     'target_xy': (0.0, 3.0),
-                        #     'speed': 0.4,
-                        #     'size': (0.4, 0.3, 1.8),
-                        #     'color': (0.8, 0.2, 0.2),
-                        # },
+                        # North
+                        {
+                            'id': 'human_north',
+                            'type': 'human',
+                            'start_xy': (0.0, 3.0),
+                            'motion': 'linear',
+                            'target_xy': (0.0, -3.0),
+                            'speed': 0.4,
+                            'size': (0.4, 0.3, 1.8),
+                            'color': (0.2, 0.4, 0.8),
+                        },
+                        # South
+                        {
+                            'id': 'human_south',
+                            'type': 'human',
+                            'start_xy': (0.0, -3.0),
+                            'motion': 'linear',
+                            'target_xy': (0.0, 3.0),
+                            'speed': 0.4,
+                            'size': (0.4, 0.3, 1.8),
+                            'color': (0.8, 0.2, 0.2),
+                        },
                         # East
                         {
                             'id': 'cart_east',
@@ -196,16 +196,16 @@ class WarehouseConvoyCfgVisual:
                             'color': (0.8, 0.6, 0.0),
                         },
                         # West
-                        # {
-                        #     'id': 'cart_west',
-                        #     'type': 'cart',
-                        #     'start_xy': (-3.0, 0.3),
-                        #     'motion': 'linear',
-                        #     'target_xy': (3.0, 0.3),
-                        #     'speed': 0.35,
-                        #     'size': (0.6, 0.6, 1.0),
-                        #     'color': (0.2, 0.8, 0.2),
-                        # },
+                        {
+                            'id': 'cart_west',
+                            'type': 'cart',
+                            'start_xy': (-3.0, 0.3),
+                            'motion': 'linear',
+                            'target_xy': (3.0, 0.3),
+                            'speed': 0.35,
+                            'size': (0.6, 0.6, 1.0),
+                            'color': (0.2, 0.8, 0.2),
+                        },
                     ]
                 },
                 'zigzag': {

@@ -22,11 +22,8 @@ class ClfCbfConvoyControllerDebug:
     """
     CLF-CBF controller with extensive debugging and robust solver fallback.
     
-    Tries multiple solvers in order:
-    1. CLARABEL (fast, modern QP solver)
-    2. SCS (robust, handles QP well)
-    3. ECOS (reliable fallback)
-    4. OSQP (if others fail)
+    CRITICAL FIX: Always references env.obstacle_centers dynamically so it
+    sees moving obstacles in real-time!
     """
 
     def __init__(self, env: WarehouseConvoyEnv, cfg: WarehouseConvoyCfg):
@@ -35,7 +32,10 @@ class ClfCbfConvoyControllerDebug:
 
         self.robots: List[WheeledRobot] = env.robots
         self.formation_offsets = env.formation_offsets
-        self.obstacle_centers = env.obstacle_centers
+        
+        # ❌ DON'T DO THIS: self.obstacle_centers = env.obstacle_centers
+        # That creates a STALE copy! Moving obstacles won't be seen!
+        # ✅ Instead: Always reference env.obstacle_centers directly
 
         self.goal_xy = np.array(cfg.goal_xy, dtype=float)
 
@@ -58,8 +58,8 @@ class ClfCbfConvoyControllerDebug:
         print(f"[CBF-DEBUG]   d_safe (obstacles) = {self.d_safe}m")
         print(f"[CBF-DEBUG]   d_robot (robots) = {self.d_robot}m")
         print(f"[CBF-DEBUG]   alpha_cbf = {self.alpha_cbf}")
-        print(f"[CBF-DEBUG]   Obstacles: {len(self.obstacle_centers)}")
-        for i, obs in enumerate(self.obstacle_centers):
+        print(f"[CBF-DEBUG]   Initial obstacles: {len(self.env.obstacle_centers)}")
+        for i, obs in enumerate(self.env.obstacle_centers):
             print(f"[CBF-DEBUG]     Obstacle {i}: {obs}")
 
     def _detect_working_solver(self):
@@ -113,10 +113,16 @@ class ClfCbfConvoyControllerDebug:
         return V_dot + self.gamma_clf * V <= slack
 
     def _compute_cbf_obstacle_constraints(self, pos: np.ndarray, u: cp.Variable, robot_idx: int):
+        """
+        CRITICAL: Always get FRESH obstacle list from env!
+        """
         constraints = []
         active_obstacles = []
         
-        for obs_idx, obs in enumerate(self.obstacle_centers):
+        # ✅ Get fresh obstacle list (includes moving obstacles!)
+        obstacle_centers = self.env.obstacle_centers
+        
+        for obs_idx, obs in enumerate(obstacle_centers):
             diff = pos - obs
             dist = np.linalg.norm(diff)
             dist_sq = np.dot(diff, diff)
@@ -175,7 +181,7 @@ class ClfCbfConvoyControllerDebug:
             constraints.append(self._compute_clf_constraint(pos, ref, u, slack))
             constraints.append(slack >= 0)
         
-        # CBF obstacles
+        # CBF obstacles (will get FRESH list from env!)
         cbf_constraints, active_obstacles = self._compute_cbf_obstacle_constraints(pos, u, robot_idx)
         constraints.extend(cbf_constraints)
         
@@ -283,12 +289,17 @@ class ClfCbfConvoyControllerDebug:
         return self.last_qp_status
 
     def print_safety_margins(self):
+        """Print current safety margins with FRESH obstacle data."""
         print("\n=== Safety Margins ===")
+        
+        # Get fresh obstacle list
+        obstacle_centers = self.env.obstacle_centers
+        
         for i, robot in enumerate(self.robots):
             pos, _, _ = self._get_xy_z_quat(robot)
             
-            if len(self.obstacle_centers) > 0:
-                obs_dists = [np.linalg.norm(pos - obs) for obs in self.obstacle_centers]
+            if len(obstacle_centers) > 0:
+                obs_dists = [np.linalg.norm(pos - obs) for obs in obstacle_centers]
                 min_obs_dist = min(obs_dists)
                 min_obs_idx = obs_dists.index(min_obs_dist)
                 
