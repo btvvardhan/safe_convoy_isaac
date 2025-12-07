@@ -185,17 +185,17 @@ class WarehouseConvoyCfgVisual:
                         #     'color': (0.8, 0.2, 0.2),
                         # },
                         # East
-                        # {
-                        #     'id': 'cart_east',
-                        #     'type': 'cart',
-                        #     'start_xy': (3.0, -0.3),
-                        #     'motion': 'linear',
-                        #     'target_xy': (-3.0, -0.3),
-                        #     'speed': 0.35,
-                        #     'size': (0.6, 0.6, 1.0),
-                        #     'color': (0.8, 0.6, 0.0),
-                        # },
-                        # # West
+                        {
+                            'id': 'cart_east',
+                            'type': 'cart',
+                            'start_xy': (3.0, -0.3),
+                            'motion': 'linear',
+                            'target_xy': (-3.0, -0.3),
+                            'speed': 0.35,
+                            'size': (0.6, 0.6, 1.0),
+                            'color': (0.8, 0.6, 0.0),
+                        },
+                        # West
                         # {
                         #     'id': 'cart_west',
                         #     'type': 'cart',

@@ -10,7 +10,7 @@ if THIS_DIR not in sys.path:
 from isaacsim.core.api import World
 from isaacsim.core.utils.stage import add_reference_to_stage
 from isaacsim.storage.native import get_assets_root_path
-from isaacsim.core.api.objects import DynamicCuboid
+from isaacsim.core.api.objects import DynamicCuboid, FixedCuboid  # ADDED FixedCuboid!
 from isaacsim.robot.wheeled_robots.robots import WheeledRobot
 
 from warehouse_convoy_cfg_visual import WarehouseConvoyCfgVisual
@@ -20,7 +20,7 @@ from moving_obstacle_manager import MovingObstacleManager
 class WarehouseConvoyEnvVisual:
     """
     Enhanced environment with:
-    - Moving obstacles (humans, carts)
+    - Moving obstacles (humans, carts) - NOW USING FIXED CUBOIDS SO THEY CAN'T BE PUSHED!
     - Visual effects support
     - Real-time obstacle list updates
     """
@@ -137,8 +137,9 @@ class WarehouseConvoyEnvVisual:
             pos = np.array([ox, oy, pallet_height / 2.0])
             prim_path = f"/World/StaticPallet_{idx}"
             
+            # Use FixedCuboid so they can't be pushed
             pallet = self.world.scene.add(
-                DynamicCuboid(
+                FixedCuboid(
                     prim_path=prim_path,
                     name=f"static_pallet_{idx}",
                     position=pos,
@@ -156,7 +157,14 @@ class WarehouseConvoyEnvVisual:
     # --------------------------------------------------------------------- #
 
     def _create_moving_obstacles(self):
-        """Create moving obstacles (humans, carts, etc.)."""
+        """
+        Create moving obstacles (humans, carts, etc.).
+        
+        CRITICAL FIX: Use FixedCuboid instead of DynamicCuboid!
+        - FixedCuboid = kinematic, won't be pushed by robots
+        - We manually update position via set_world_pose()
+        - Robots will avoid them but can't push them
+        """
         # Create manager
         self.moving_obstacle_manager = MovingObstacleManager(
             self.cfg.moving_obstacles_config
@@ -173,8 +181,9 @@ class WarehouseConvoyEnvVisual:
             
             prim_path = f"/World/MovingObstacle_{obs_config['id']}"
             
+            # CRITICAL: Use FixedCuboid so robots can't push them!
             prim = self.world.scene.add(
-                DynamicCuboid(
+                FixedCuboid(  # CHANGED from DynamicCuboid!
                     prim_path=prim_path,
                     name=f"moving_{obs_config['id']}",
                     position=pos,
@@ -183,6 +192,8 @@ class WarehouseConvoyEnvVisual:
                 )
             )
             self.moving_obstacle_prims.append(prim)
+            
+        print(f"[ENV] Created {len(self.moving_obstacle_prims)} FIXED (non-pushable) moving obstacles")
 
     def _update_moving_obstacle_positions(self):
         """Update visual prims to match obstacle manager positions."""
@@ -198,6 +209,7 @@ class WarehouseConvoyEnvVisual:
                 info['position'][1],
                 info['size'][2] / 2.0  # height / 2
             ])
+            # FixedCuboid can still be moved via set_world_pose!
             prim.set_world_pose(position=new_pos)
 
     # --------------------------------------------------------------------- #
