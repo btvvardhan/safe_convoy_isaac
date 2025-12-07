@@ -21,6 +21,10 @@ class MovingObstacle:
         # Motion-specific parameters
         self.config = config
         
+        # Collision avoidance with other obstacles
+        self.obstacle_avoidance_radius = 0.8  # meters
+        self.avoidance_strength = 0.5
+        
         # For linear motion
         if self.motion == 'linear':
             self.target = np.array(config['target_xy'], dtype=float)
@@ -54,10 +58,31 @@ class MovingObstacle:
             if dist > 1e-6:
                 self.velocity = (direction / dist) * self.speed
     
-    def update(self, dt: float):
-        """Update obstacle position based on motion pattern."""
+    def compute_avoidance_velocity(self, other_obstacles: List['MovingObstacle']) -> np.ndarray:
+        """Compute avoidance velocity to prevent collisions with other obstacles."""
+        avoidance_vel = np.zeros(2)
+        
+        for other in other_obstacles:
+            if other.id == self.id:
+                continue
+            
+            # Vector from other to self
+            diff = self.position - other.position
+            dist = np.linalg.norm(diff)
+            
+            # If too close, add repulsive velocity
+            if dist < self.obstacle_avoidance_radius and dist > 1e-6:
+                # Repulsive force (inverse square)
+                magnitude = self.avoidance_strength * (self.obstacle_avoidance_radius - dist) / dist
+                avoidance_vel += (diff / dist) * magnitude
+        
+        return avoidance_vel
+    
+    def update(self, dt: float, other_obstacles: List['MovingObstacle'] = None):
+        """Update obstacle position based on motion pattern + collision avoidance."""
         self.time += dt
         
+        # Get nominal velocity from motion pattern
         if self.motion == 'linear':
             self._update_linear(dt)
         elif self.motion == 'circular':
@@ -66,6 +91,16 @@ class MovingObstacle:
             self._update_zigzag(dt)
         elif self.motion == 'sudden_stop':
             self._update_sudden_stop(dt)
+        
+        # Add collision avoidance with other obstacles
+        if other_obstacles and len(other_obstacles) > 1:
+            avoidance_vel = self.compute_avoidance_velocity(other_obstacles)
+            self.velocity += avoidance_vel
+            
+            # Clamp velocity to max speed
+            vel_magnitude = np.linalg.norm(self.velocity)
+            if vel_magnitude > self.speed * 1.5:  # Allow 50% overspeed for avoidance
+                self.velocity = (self.velocity / vel_magnitude) * (self.speed * 1.5)
     
     def _update_linear(self, dt: float):
         """Linear motion toward target, then reverse."""
@@ -135,7 +170,7 @@ class MovingObstacle:
 
 
 class MovingObstacleManager:
-    """Manages all moving obstacles in the environment."""
+    """Manages all moving obstacles in the environment with inter-obstacle collision avoidance."""
     
     def __init__(self, obstacle_configs: List[dict]):
         self.obstacles: List[MovingObstacle] = []
@@ -144,11 +179,12 @@ class MovingObstacleManager:
             self.obstacles.append(MovingObstacle(config))
         
         print(f"[MOVING_OBS] Created {len(self.obstacles)} moving obstacles")
+        print(f"[MOVING_OBS] Inter-obstacle collision avoidance: ENABLED")
     
     def update(self, dt: float):
-        """Update all obstacles."""
+        """Update all obstacles with collision avoidance."""
         for obstacle in self.obstacles:
-            obstacle.update(dt)
+            obstacle.update(dt, other_obstacles=self.obstacles)
     
     def get_positions(self) -> np.ndarray:
         """Get current positions of all obstacles."""
