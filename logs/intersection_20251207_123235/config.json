@@ -1,0 +1,6 @@
+{
+  "scenario": "intersection",
+  "num_robots": 4,
+  "leader_speed": 0.6,
+  "v_max": 0.7
+}

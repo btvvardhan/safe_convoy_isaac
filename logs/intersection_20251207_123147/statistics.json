@@ -1,0 +1,7 @@
+{
+  "total_steps": 60,
+  "total_cbf_activations": 0,
+  "qp_failures": 0,
+  "safety_violations": 8,
+  "min_distance_ever": 0.06483226778686521
+}
