@@ -20,7 +20,13 @@ from env.warehouse_convoy_cfg import WarehouseConvoyCfg
 
 class ClfCbfConvoyControllerDebug:
     """
-    CLF-CBF controller with extensive debugging to diagnose why avoidance isn't working.
+    CLF-CBF controller with extensive debugging and robust solver fallback.
+    
+    Tries multiple solvers in order:
+    1. CLARABEL (fast, modern QP solver)
+    2. SCS (robust, handles QP well)
+    3. ECOS (reliable fallback)
+    4. OSQP (if others fail)
     """
 
     def __init__(self, env: WarehouseConvoyEnv, cfg: WarehouseConvoyCfg):
@@ -44,13 +50,47 @@ class ClfCbfConvoyControllerDebug:
         self.cbf_active_count = {}
         self.step_count = 0
         
+        # Detect working solver
+        self.working_solver = self._detect_working_solver()
+        
         print(f"[CBF-DEBUG] Controller initialized:")
+        print(f"[CBF-DEBUG]   Using solver: {self.working_solver}")
         print(f"[CBF-DEBUG]   d_safe (obstacles) = {self.d_safe}m")
         print(f"[CBF-DEBUG]   d_robot (robots) = {self.d_robot}m")
         print(f"[CBF-DEBUG]   alpha_cbf = {self.alpha_cbf}")
         print(f"[CBF-DEBUG]   Obstacles: {len(self.obstacle_centers)}")
         for i, obs in enumerate(self.obstacle_centers):
             print(f"[CBF-DEBUG]     Obstacle {i}: {obs}")
+
+    def _detect_working_solver(self):
+        """Test which solver works with this cvxpy/OSQP setup."""
+        # Create tiny test problem
+        u = cp.Variable(2)
+        obj = cp.Minimize(cp.sum_squares(u))
+        constraints = [u[0] <= 1, u[0] >= -1, u[1] <= 1, u[1] >= -1]
+        prob = cp.Problem(obj, constraints)
+        
+        # Try solvers in order of preference
+        solvers_to_try = [
+            ('CLARABEL', cp.CLARABEL),
+            ('SCS', cp.SCS),
+            ('ECOS', cp.ECOS),
+            ('OSQP', cp.OSQP),
+        ]
+        
+        for name, solver in solvers_to_try:
+            try:
+                prob.solve(solver=solver, verbose=False)
+                if prob.status in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
+                    print(f"[CBF-DEBUG] ✅ {name} solver works!")
+                    return solver
+            except Exception as e:
+                print(f"[CBF-DEBUG] ❌ {name} failed: {str(e)[:50]}")
+                continue
+        
+        # If all fail, default to OSQP and hope for the best
+        print(f"[CBF-DEBUG] ⚠️  All solvers failed, using OSQP anyway")
+        return cp.OSQP
 
     def _get_xy_z_quat(self, robot: WheeledRobot):
         pos, quat = robot.get_world_pose()
@@ -143,7 +183,6 @@ class ClfCbfConvoyControllerDebug:
         constraints.extend(self._compute_cbf_robot_constraints(pos, u, robot_idx))
         
         # Velocity bounds (box constraint for QP compatibility)
-        # Instead of ||u|| <= v_max (conic), use component-wise bounds
         constraints.append(u[0] <= self.cfg.v_max)
         constraints.append(u[0] >= -self.cfg.v_max)
         constraints.append(u[1] <= self.cfg.v_max)
@@ -156,10 +195,10 @@ class ClfCbfConvoyControllerDebug:
             for obs_idx, dist in active_obstacles:
                 print(f"[CBF-DEBUG]     Obstacle {obs_idx}: dist = {dist:.3f}m")
         
-        # Solve
+        # Solve with working solver
         problem = cp.Problem(objective, constraints)
         try:
-            problem.solve(solver=cp.OSQP, verbose=False)
+            problem.solve(solver=self.working_solver, verbose=False)
             
             if problem.status in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
                 u_safe = u.value
@@ -174,23 +213,13 @@ class ClfCbfConvoyControllerDebug:
                 return u_safe
             else:
                 # QP failed
-                print(f"[CBF-DEBUG] Robot {robot_idx} QP FAILED: {problem.status}")
+                if self.step_count % 100 == 0:  # Reduce spam
+                    print(f"[CBF-DEBUG] Robot {robot_idx} QP FAILED: {problem.status}")
                 self.last_qp_status[robot_idx] = f"failed_{problem.status}"
                 return self._clamp_vec(u_nom, self.cfg.v_max)
-        except TypeError as e:
-            # Handle version incompatibility with OSQP parameters
-            if "raise_error" in str(e):
-                try:
-                    problem.solve(solver=cp.OSQP, verbose=False)
-                    if problem.status in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
-                        return u.value
-                except:
-                    pass
-            print(f"[CBF-DEBUG] Robot {robot_idx} QP ERROR: {e}")
-            self.last_qp_status[robot_idx] = f"error"
-            return self._clamp_vec(u_nom, self.cfg.v_max)
         except Exception as e:
-            print(f"[CBF-DEBUG] Robot {robot_idx} QP ERROR: {e}")
+            if self.step_count % 100 == 0:  # Reduce spam
+                print(f"[CBF-DEBUG] Robot {robot_idx} QP ERROR: {str(e)[:80]}")
             self.last_qp_status[robot_idx] = f"error"
             return self._clamp_vec(u_nom, self.cfg.v_max)
 
