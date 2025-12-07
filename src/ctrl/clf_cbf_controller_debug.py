@@ -142,8 +142,12 @@ class ClfCbfConvoyControllerDebug:
         # CBF robots
         constraints.extend(self._compute_cbf_robot_constraints(pos, u, robot_idx))
         
-        # Velocity bounds
-        constraints.append(cp.norm(u, 2) <= self.cfg.v_max)
+        # Velocity bounds (box constraint for QP compatibility)
+        # Instead of ||u|| <= v_max (conic), use component-wise bounds
+        constraints.append(u[0] <= self.cfg.v_max)
+        constraints.append(u[0] >= -self.cfg.v_max)
+        constraints.append(u[1] <= self.cfg.v_max)
+        constraints.append(u[1] >= -self.cfg.v_max)
         
         # DEBUG: Print when CBF is active
         if active_obstacles and self.step_count % 50 == 0:
@@ -155,7 +159,7 @@ class ClfCbfConvoyControllerDebug:
         # Solve
         problem = cp.Problem(objective, constraints)
         try:
-            problem.solve(solver=cp.OSQP, verbose=False, eps_abs=1e-4, eps_rel=1e-4)
+            problem.solve(solver=cp.OSQP, verbose=False, eps_abs=1e-4, eps_rel=1e-4, max_iter=4000)
             
             if problem.status in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
                 u_safe = u.value
@@ -173,6 +177,18 @@ class ClfCbfConvoyControllerDebug:
                 print(f"[CBF-DEBUG] Robot {robot_idx} QP FAILED: {problem.status}")
                 self.last_qp_status[robot_idx] = f"failed_{problem.status}"
                 return self._clamp_vec(u_nom, self.cfg.v_max)
+        except TypeError as e:
+            # Handle version incompatibility with OSQP parameters
+            if "raise_error" in str(e):
+                try:
+                    problem.solve(solver=cp.OSQP, verbose=False)
+                    if problem.status in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
+                        return u.value
+                except:
+                    pass
+            print(f"[CBF-DEBUG] Robot {robot_idx} QP ERROR: {e}")
+            self.last_qp_status[robot_idx] = f"error"
+            return self._clamp_vec(u_nom, self.cfg.v_max)
         except Exception as e:
             print(f"[CBF-DEBUG] Robot {robot_idx} QP ERROR: {e}")
             self.last_qp_status[robot_idx] = f"error"

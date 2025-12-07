@@ -202,8 +202,12 @@ class ClfCbfConvoyController:
         # 3) CBF constraints (robot-robot avoidance)
         constraints.extend(self._compute_cbf_robot_constraints(pos, u, robot_idx))
         
-        # 4) Velocity bounds
-        constraints.append(cp.norm(u, 2) <= self.cfg.v_max)
+        # 4) Velocity bounds (box constraint for QP compatibility)
+        # Instead of ||u|| <= v_max (conic), use component-wise bounds
+        constraints.append(u[0] <= self.cfg.v_max)
+        constraints.append(u[0] >= -self.cfg.v_max)
+        constraints.append(u[1] <= self.cfg.v_max)
+        constraints.append(u[1] >= -self.cfg.v_max)
         
         # Solve
         problem = cp.Problem(objective, constraints)
