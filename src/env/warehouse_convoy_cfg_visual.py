@@ -55,47 +55,6 @@ class WarehouseConvoyCfgVisual:
     # Each entry: (start_x, start_y, motion_type, speed, params)
     moving_obstacles_config: List[dict] = None  # Will be set in __post_init__
     
-    def __post_init__(self):
-        if self.moving_obstacles_config is None:
-            self.moving_obstacles_config = [
-                # Human crossing from left to right
-                {
-                    'id': 'human_1',
-                    'type': 'human',
-                    'start_xy': (0.0, -3.0),
-                    'motion': 'linear',
-                    'target_xy': (0.0, 3.0),
-                    'speed': 0.4,
-                    'size': (0.4, 0.3, 1.8),  # width, depth, height
-                    'color': (0.2, 0.4, 0.8),  # Blue
-                },
-                # Cart going in circles
-                {
-                    'id': 'cart_1',
-                    'type': 'cart',
-                    'start_xy': (-1.5, 0.0),
-                    'motion': 'circular',
-                    'center_xy': (-1.5, 0.0),
-                    'radius': 1.0,
-                    'speed': 0.3,
-                    'size': (0.6, 0.6, 1.0),
-                    'color': (0.8, 0.6, 0.0),  # Orange
-                },
-                # Human zigzagging
-                {
-                    'id': 'human_2',
-                    'type': 'human',
-                    'start_xy': (2.0, -2.0),
-                    'motion': 'zigzag',
-                    'amplitude': 0.8,
-                    'frequency': 0.5,
-                    'direction': (0.0, 1.0),  # Moving up
-                    'speed': 0.35,
-                    'size': (0.4, 0.3, 1.8),
-                    'color': (0.8, 0.2, 0.2),  # Red
-                },
-            ]
-    
     # ================================================================
     # VISUAL EFFECTS
     # ================================================================
@@ -139,7 +98,54 @@ class WarehouseConvoyCfgVisual:
     # Scenario-specific configs (can be overridden)
     scenario_configs: dict = None
     
+    # ================================================================
+    # SINGLE __post_init__ - CRITICAL FIX!
+    # Python dataclasses only allow ONE __post_init__ method.
+    # The original had two, causing moving_obstacles_config to be None.
+    # ================================================================
     def __post_init__(self):
+        # Initialize moving obstacles config (default scenario)
+        if self.moving_obstacles_config is None:
+            self.moving_obstacles_config = [
+                # Human crossing from left to right
+                {
+                    'id': 'human_1',
+                    'type': 'human',
+                    'start_xy': (0.0, -3.0),
+                    'motion': 'linear',
+                    'target_xy': (0.0, 3.0),
+                    'speed': 0.4,
+                    'size': (0.4, 0.3, 1.8),  # width, depth, height
+                    'color': (0.2, 0.4, 0.8),  # Blue
+                },
+                # Cart going in circles
+                {
+                    'id': 'cart_1',
+                    'type': 'cart',
+                    'start_xy': (-1.5, 0.0),
+                    'motion': 'circular',
+                    'center_xy': (-1.5, 0.0),
+                    'radius': 1.0,
+                    'speed': 0.3,
+                    'size': (0.6, 0.6, 1.0),
+                    'color': (0.8, 0.6, 0.0),  # Orange
+                },
+                # Human zigzagging
+                {
+                    'id': 'human_2',
+                    'type': 'human',
+                    'start_xy': (2.0, -2.0),
+                    'motion': 'zigzag',
+                    'amplitude': 0.8,
+                    'frequency': 0.5,
+                    'direction': (0.0, 1.0),  # Moving up
+                    'speed': 0.35,
+                    'size': (0.4, 0.3, 1.8),
+                    'color': (0.8, 0.2, 0.2),  # Red
+                },
+            ]
+        
+        # Initialize scenario configs
         if self.scenario_configs is None:
             self.scenario_configs = {
                 'corridor': {
