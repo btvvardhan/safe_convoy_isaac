@@ -256,24 +256,18 @@ safe_convoy_isaac/
 ├── src/
 │   │
 │   ├── ctrl/                              # Controllers
-│   │   ├── formation_p_controller.py          # Baseline P-controller (no CBF)
-│   │   ├── clf_cbf_controller.py              # Basic CLF-CBF
 │   │   ├── clf_cbf_controller_debug.py        # Enhanced CLF-CBF (MAIN)
 │   │   └── adaptive_spacing_controller.py     # Adaptive safety margins
 │   │
 │   ├── env/                               # Environment & Configuration
-│   │   ├── warehouse_convoy_cfg.py            # Basic config
 │   │   ├── warehouse_convoy_cfg_visual.py     # Visual demo config
-│   │   ├── warehouse_convoy_env.py            # Basic environment
 │   │   ├── warehouse_convoy_env_visual.py     # Visual environment (MAIN)
 │   │   ├── moving_obstacle_manager.py         # Moving obstacle logic
 │   │   ├── visual_effects.py                  # Visual effects (trails, colors)
 │   │   └── data_logger.py                     # Data logging & plotting
 │   │
-│   ├── run_convoy.py                      # Basic demo (P-controller)
 │   ├── run_convoy_debug.py                # CLF-CBF debug (static obstacles)
-│   ├── run_visual_demo.py                 # Visual demo (moving obstacles)
-│   └── run_adaptive_demo.py               # Adaptive spacing demo
+│   └── run_visual_demo.py                 # Visual demo (moving obstacles)
 │
 ├── logs/                                  # Auto-generated logs
 ├── run_isaac.sh                           # Quick launch script
@@ -318,10 +312,8 @@ safe_convoy_isaac/
 
 | Script | Purpose | Obstacles | Controller | Use Case |
 |--------|---------|-----------|------------|----------|
-| `run_convoy.py` | Baseline | Static | P-controller | Comparison baseline |
 | `run_convoy_debug.py` | Debug CLF-CBF | Static | CLF-CBF Debug | Testing/debugging |
 | `run_visual_demo.py` | Full visual demo | Moving | CLF-CBF Debug | Presentation/recording |
-| `run_adaptive_demo.py` | Adaptive spacing | Moving | Adaptive CLF-CBF | Advanced demo |
 
 ---
 
@@ -582,19 +574,6 @@ constraints.append(u[1] >= -v_max)
 ## ⚙️ Configuration & Tuning
 
 ### Configuration Files
-
-**Basic Config (`warehouse_convoy_cfg.py`):**
-```python
-@dataclass
-class WarehouseConvoyCfg:
-    num_followers: int = 3
-    leader_start_xy: Tuple[float, float] = (-4.0, 0.0)
-    goal_xy: Tuple[float, float] = (4.0, 0.0)
-    spacing: float = 0.7
-    leader_speed: float = 0.6
-    follower_k: float = 1.5
-    v_max: float = 0.7
-```
 
 **Visual Config (`warehouse_convoy_cfg_visual.py`):**
 - Includes moving obstacle configurations
@@ -893,11 +872,11 @@ cd ~/safe_convoy_isaac
 
 1. **Are you using the correct controller?**
    ```bash
-   # ✅ Correct (CLF-CBF)
+   # ✅ Use CLF-CBF debug version
    ~/isaac-sim/python.sh src/run_convoy_debug.py
    
-   # ❌ Wrong (basic P-controller, no CBF)
-   ~/isaac-sim/python.sh src/run_convoy.py
+   # ✅ Or use visual demo with moving obstacles
+   ~/isaac-sim/python.sh src/run_visual_demo.py
    ```
 
 2. **Is CBF getting fresh obstacle data?**
