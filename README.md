@@ -161,7 +161,7 @@ cd ~/isaac-sim
 ```bash
 # Clone repository
 cd ~
-git clone https://github.com/yourusername/safe_convoy_isaac.git
+git clone https://github.com/btvvardhan/safe_convoy_isaac.git
 cd safe_convoy_isaac
 
 # Project structure should look like:
@@ -1186,7 +1186,7 @@ cd ~/isaac-sim
 
 # 3. Clone project
 cd ~
-git clone https://github.com/yourusername/safe_convoy_isaac.git
+git clone https://github.com/btvvardhan/safe_convoy_isaac.git
 cd safe_convoy_isaac
 
 # 4. Run demo
