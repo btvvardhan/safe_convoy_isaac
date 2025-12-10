@@ -14,8 +14,8 @@ if SRC_ROOT not in sys.path:
 
 from isaacsim.robot.wheeled_robots.robots import WheeledRobot
 
-from env.warehouse_convoy_env import WarehouseConvoyEnv
-from env.warehouse_convoy_cfg import WarehouseConvoyCfg
+from env.warehouse_convoy_env_visual import WarehouseConvoyEnvVisual as WarehouseConvoyEnv
+from env.warehouse_convoy_cfg_visual import WarehouseConvoyCfgVisual as WarehouseConvoyCfg
 
 
 class ClfCbfConvoyControllerDebug:

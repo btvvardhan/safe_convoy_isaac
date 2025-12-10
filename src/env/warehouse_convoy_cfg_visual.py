@@ -34,7 +34,7 @@ class WarehouseConvoyCfgVisual:
     # ASSETS
     # ================================================================
     warehouse_relpath: str = (
-        "/Isaac/Environments/Simple_Warehouse/warehouse_multiple_shelves.usd"
+        "/Isaac/Environments/Simple_Warehouse/full_warehouse.usd"
     )
     jetbot_relpath: str = "/Isaac/Robots/NVIDIA/Jetbot/jetbot.usd"
     
