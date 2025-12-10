@@ -3,7 +3,9 @@ logs/
 
 # Python
 __pycache__/
+*/__pycache__/
 *.py[cod]
+*.cpython-*.pyc
 *$py.class
 *.so
 .Python
