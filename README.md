@@ -1103,22 +1103,6 @@ This differential inequality implies:
 
 ---
 
-## 🎓 For Academic Use
-
-### Citation
-
-If you use this work in your research, please cite:
-
-```bibtex
-@misc{safe_convoy_clf_cbf,
-  title={Safe Warehouse Convoy with CLF-CBF Control},
-  author={Your Name},
-  year={2024},
-  howpublished={\url{https://github.com/yourusername/safe_convoy_isaac}},
-  note={Master's project on safety-critical control for multi-robot systems}
-}
-```
-
 ### Extensions for Research
 
 **Tier 1 (2-3 weeks):**
@@ -1189,27 +1173,6 @@ When reporting issues, include:
    # Exact command that causes the error
    ```
 
-### Contact
-
-- **GitHub Issues:** https://github.com/yourusername/safe_convoy_isaac/issues
-- **Email:** your.email@example.com
-
----
-
-## ✅ Pre-Presentation Checklist
-
-Before your demo/presentation:
-
-- [ ] Isaac Sim launches without errors
-- [ ] All 5 scenarios run successfully
-- [ ] Videos recorded (2-3 clips per scenario)
-- [ ] Plots generated and look professional
-- [ ] Statistics show 0 collisions
-- [ ] QP solve rate is 100%
-- [ ] Console shows 🟡 markers (CBF activation)
-- [ ] Backup videos ready (if live demo fails)
-- [ ] Explanation of CLF-CBF theory prepared
-- [ ] Comparison with baseline (P-controller) ready
 
 ---
 
