@@ -317,37 +317,7 @@ safe_convoy_isaac/
 
 ---
 
-## 🎮 Running Demos
-
-### Demo 1: Static Obstacles (Debug Mode)
-
-**Purpose:** Test CLF-CBF with fixed obstacles, debug output
-
-```bash
-~/isaac-sim/python.sh src/run_convoy_debug.py
-```
-
-**Features:**
-- 3 static pallet obstacles
-- CLF-CBF controller with debug output
-- Real-time safety margins in console
-
-**Console Output:**
-```
-=== Safety Margins ===
-🟢 Robot 0: min_obs_dist = 1.234m (to obs 0, d_safe=0.6m)
-🟡 Robot 1: min_obs_dist = 0.678m (to obs 1, d_safe=0.6m)
-🔴 Robot 2: min_obs_dist = 0.456m (to obs 2, d_safe=0.6m)
-```
-
-**Color Legend:**
-- 🟢 **Green** - Safe (>0.8m from obstacles)
-- 🟡 **Yellow** - CBF active (0.6-0.8m)
-- 🔴 **Red** - Very close (<0.6m) - CBF enforcing safety
-
----
-
-### Demo 2: Moving Obstacles (Visual Demo)
+### Demo : Moving Obstacles (Visual Demo)
 
 **Purpose:** Full presentation demo with moving obstacles and scenarios
 
