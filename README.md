@@ -380,32 +380,6 @@ safe_convoy_isaac/
 # Custom duration
 ~/isaac-sim/python.sh src/run_visual_demo.py --scenario intersection --duration 60
 ```
-
----
-
-### Demo 3: Adaptive Spacing
-
-**Purpose:** Shows intelligent adaptation to environment
-
-```bash
-~/isaac-sim/python.sh src/run_adaptive_demo.py --scenario adaptive_demo --duration 40
-```
-
-**What it does:**
-- Robot detects corridor width in real-time
-- Adjusts safety margin automatically:
-  - **Wide corridors** (>2.5m clearance) → d_safe = 0.8m (conservative)
-  - **Narrow passages** (<1.5m clearance) → d_safe = 0.4m (aggressive)
-  - **Transition zones** → Smooth interpolation
-
-**Console Output:**
-```
-=== Adaptive Safety Margins ===
-🟦 WIDE Robot 0: dist=1.856m, d_safe=0.800m (obs 0)
-🟨 TRANSITION Robot 1: dist=0.923m, d_safe=0.612m (obs 1)
-🟥 NARROW Robot 2: dist=0.534m, d_safe=0.400m (obs 2)
-```
-
 ---
 
 ## 🧮 Understanding CLF-CBF
